@@ -3,7 +3,6 @@ package matchservice
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -15,9 +14,14 @@ import (
 )
 
 type Match struct {
-	playerOne, playerTwo, playerThree, playerFour string
-	scoreOne, scoreTwo                            int8
-	playedAt                                      time.Time
+	PlayerOne, PlayerTwo, PlayerThree, PlayerFour string
+	ScoreOne, ScoreTwo                            int8
+	PlayedAt                                      time.Time
+}
+
+func (m Match) toString() string {
+	json, _ := json.Marshal(m)
+	return string(json)
 }
 
 func New() *restful.WebService {
@@ -83,38 +87,60 @@ func SaveMatch(usr Match) {
 }
 
 func ValidateMatch(match Match) error {
-	if match.playerOne == "" || match.playerTwo == "" {
+	if match.PlayerOne == "" || match.PlayerTwo == "" {
 		return errors.New("Needs atleast two players, to enter a match")
 	}
-	if match.scoreOne < 10 && match.scoreTwo < 10 {
+	if match.ScoreOne < 10 && match.ScoreTwo < 10 {
 		return errors.New("Exactly one player or team must have the score of 10")
 	}
-	if match.scoreOne == 10 && match.scoreTwo == 10 {
+	if match.ScoreOne == 10 && match.ScoreTwo == 10 {
 		return errors.New("Only one match may reach the score of 10")
 	}
 	return nil
 }
 
+func ValidatePlayersInMatch(match Match) {
+	if match.PlayerOne == "" && match.PlayerTwo == "" {
+		panic("A Match needs atleast two players")
+	}
+	if match.PlayerThree != "" && match.PlayerFour == "" {
+		panic("A fourth player is needed")
+	}
+
+	if match.PlayerThree == "" && match.PlayerFour != "" {
+		panic("A thrid player is needed")
+	}
+
+	playerservice.FindUser(match.PlayerOne)
+	playerservice.FindUser(match.PlayerTwo)
+	if match.PlayerThree != "" {
+		playerservice.FindUser(match.PlayerThree)
+		playerservice.FindUser(match.PlayerFour)
+
+	}
+}
+
 func CreateMatch(request *restful.Request, response *restful.Response) {
-	usr := Match{playerOne: "playerOne",
-		playerTwo:   "playerTwo",
-		playerThree: "playerThree",
-		playerFour:  "playerFour",
-		playedAt:    time.Now()}
+	match := Match{PlayerOne: "PlayerOne",
+		PlayerTwo:   "PlayerTwo",
+		PlayerThree: "playerThree",
+		PlayerFour:  "playerFour",
+		PlayedAt:    time.Now()}
 
-	jsonUser, _ := json.Marshal(usr)
-	fmt.Println("--> Initial usr: ", string(jsonUser))
+	//jsonUser, _ := json.Marshal(usr)
+	//fmt.Println("--> Initial usr: ", string(jsonUser))
 
-	err := request.ReadEntity(&usr)
-	ValidateMatch(usr)
-	fmt.Println("Trying to find: ", usr.playerOne)
-	pOne := playerservice.FindUser(usr.playerOne)
-	fmt.Println("Player one: ", pOne.Name)
-	//	fmt.Println("Usr: ", usr.Id)
-	SaveMatch(usr)
+	err := request.ReadEntity(&match)
+	match.PlayedAt = time.Now()
+	ValidateMatch(match)
+	ValidatePlayersInMatch(match)
+	//	fmt.Printf("JSON Match payload: %s\n", match.toString())
+	//	fmt.Println("Trying to find: ", match.PlayerOne)
+
+	SaveMatch(match)
 	// here you would create the user with some persistence system
 	if err == nil {
-		response.WriteEntity(usr)
+		response.WriteEntity(match)
 	} else {
 		response.WriteError(http.StatusInternalServerError, err)
 	}

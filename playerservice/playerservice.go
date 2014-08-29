@@ -1,20 +1,25 @@
 package playerservice
 
 import (
+	"errors"
 	"net/http"
 
 	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/emicklei/go-restful"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type User struct {
-	Id, Name string
+	Id   string
+	Name string
 }
 
-func New() *restful.WebService {
+var (
+	repository PlayerRepository
+)
+
+func New(repo PlayerRepository) *restful.WebService {
+	repository = repo // set global state.. ohh noo
 	service := new(restful.WebService)
 	service.
 		Path("/players").
@@ -30,26 +35,10 @@ func New() *restful.WebService {
 	return service
 }
 
-func FindUser(id string) User {
-	result := User{}
-
-	c, session := getUserCollection()
-	defer session.Close()
-
-	err := c.Find(bson.M{"id": id}).One(&result)
-	if err == nil {
-		panic("Unable to find user with id: " + id)
-	}
-	return result
-}
 func FindUserService(request *restful.Request, response *restful.Response) {
 	id := request.PathParameter("user-id")
 
-	result := User{}
-	c, session := getUserCollection()
-	defer session.Close()
-
-	err := c.Find(bson.M{"id": id}).One(&result)
+	result, err := repository.FindUser(id)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 	} else {
@@ -59,14 +48,7 @@ func FindUserService(request *restful.Request, response *restful.Response) {
 }
 
 func FindAllUsers(request *restful.Request, response *restful.Response) {
-	var (
-		results []User
-	)
-
-	c, session := getUserCollection()
-	defer session.Close()
-	c.Find(bson.M{}).All(&results)
-	response.WriteEntity(results)
+	response.WriteEntity(repository.FindAllUsers())
 }
 
 func UpdateUser(request *restful.Request, response *restful.Response) {
@@ -80,41 +62,25 @@ func UpdateUser(request *restful.Request, response *restful.Response) {
 	}
 }
 
-func getUserCollection() (*mgo.Collection, *mgo.Session) {
-	session, err := mgo.Dial("localhost")
-	if err != nil {
-		panic(err)
-	}
-	//	defer session.Close()
-	// Optional. Switch the session to a monotonic behavior.
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("ranky").C("players")
-	return c, session
-}
-
-func SaveUser(usr User) {
-	c, session := getUserCollection()
-	defer session.Close()
-
-	err := c.Insert(usr)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func CreateUser(request *restful.Request, response *restful.Response) {
 	uuid := uuid.New()
 	//	fmt.Println("Trying to create user ", uuid)
 	usr := User{Id: uuid}
 
 	err := request.ReadEntity(&usr)
-	//	fmt.Println("Usr: ", usr.Id)
-	SaveUser(usr)
-	// here you would create the user with some persistence system
-	if err == nil {
-		response.WriteEntity(usr)
+	if repository.IsUserUnique(usr) {
+		usr.Id = uuid
+		//	fmt.Println("Usr: ", usr.Id)
+		repository.SaveUser(usr)
+		// here you would create the user with some persistence system
+		if err == nil {
+			response.WriteEntity(usr)
+		} else {
+			response.WriteError(http.StatusInternalServerError, err)
+		}
 	} else {
-		response.WriteError(http.StatusInternalServerError, err)
+		response.WriteError(http.StatusConflict, errors.New("Player name not unique"))
+
 	}
 }
 
