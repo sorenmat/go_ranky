@@ -15,6 +15,7 @@ import (
 var rootdir = "/Users/soren/go/src/github.com/sorenmat/ranky/static/app"
 
 func main() {
+	playerRepo := playerservice.MongoRepository{}
 	m := martini.Classic()
 	// map json encoder
 	m.Use(martini.Static("static/app"))
@@ -30,7 +31,7 @@ func main() {
 	})
 
 	m.Get("/players", func(enc encoder.Encoder) (int, []byte) {
-		players := playerservice.FindAllUsersInDb()
+		players := playerRepo.FindAllUsers()
 		return http.StatusOK, encoder.Must(enc.Encode(players))
 
 	})

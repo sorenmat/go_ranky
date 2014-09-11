@@ -72,8 +72,8 @@ func (s *MySuite) TestCreatingPlayersAndAMatch(c *C) {
 }
 
 func (s *MySuite) TestCreateSamePlayerTwice(c *C) {
-	//createPlayer("Soren")
-	//createPlayer("Soren")
+	createPlayer("Soren")
+	createPlayer("Soren")
 }
 
 func doPut(url string, body string) (string, int) {

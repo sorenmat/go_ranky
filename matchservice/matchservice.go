@@ -24,7 +24,10 @@ func (m Match) toString() string {
 	return string(json)
 }
 
-func New() *restful.WebService {
+var playerRepo playerservice.PlayerRepository
+
+func New(pRepo playerservice.PlayerRepository) *restful.WebService {
+	playerRepo = pRepo
 	service := new(restful.WebService)
 	service.
 		Path("/matches").
@@ -111,11 +114,11 @@ func ValidatePlayersInMatch(match Match) {
 		panic("A thrid player is needed")
 	}
 
-	playerservice.FindUser(match.PlayerOne)
-	playerservice.FindUser(match.PlayerTwo)
+	playerRepo.FindUser(match.PlayerOne)
+	playerRepo.FindUser(match.PlayerTwo)
 	if match.PlayerThree != "" {
-		playerservice.FindUser(match.PlayerThree)
-		playerservice.FindUser(match.PlayerFour)
+		playerRepo.FindUser(match.PlayerThree)
+		playerRepo.FindUser(match.PlayerFour)
 
 	}
 }
@@ -126,9 +129,6 @@ func CreateMatch(request *restful.Request, response *restful.Response) {
 		PlayerThree: "playerThree",
 		PlayerFour:  "playerFour",
 		PlayedAt:    time.Now()}
-
-	//jsonUser, _ := json.Marshal(usr)
-	//fmt.Println("--> Initial usr: ", string(jsonUser))
 
 	err := request.ReadEntity(&match)
 	match.PlayedAt = time.Now()
